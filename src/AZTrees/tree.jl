@@ -43,7 +43,7 @@ struct GuidedTree{S, A}
             NestedPushVector{Pair{A,Int}}(k_o, sz),
             NestedPushVector{Int}(na, sz),
             PushVector{Int}(sz),
-            PushVector{Int}(sz)
+            PushVector{Int}(sz),
 
             PushVector{Float64}(sz),
             PushVector{Vector{Float32}}(sz),
