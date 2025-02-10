@@ -1,7 +1,7 @@
 struct ACBatch{T, Q_CPU <: Array, Q_GPU <: CuArray}
     batchsize   :: Int
-    cpu_querry  :: Q_CPU
-    gpu_querry  :: Q_GPU
+    cpu_query  :: Q_CPU
+    gpu_query  :: Q_GPU
     value       :: Vector{T}
     policy      :: Matrix{T}
     agent_idxs  :: Vector{Int}
@@ -21,9 +21,9 @@ struct ACBatch{T, Q_CPU <: Array, Q_GPU <: CuArray}
     end
 end
 
-function set_querry!(batch::ACBatch, batchindex::Integer, agent_idx::Integer, query)
-    (; cpu_querry, agent_idxs, ready_count) = batch
-    cpu_querry[:, batchindex] .= query
+function set_query!(batch::ACBatch, batchindex::Integer, agent_idx::Integer, query)
+    (; cpu_query, agent_idxs, ready_count) = batch
+    cpu_query[:, batchindex] .= query
     agent_idxs[batchindex] = agent_idx
     n_ready = 1 + Threads.atomic_add!(ready_count, 1)
     return n_ready
@@ -37,9 +37,9 @@ function get_response(batch::ACBatch, index::Integer)
 end
 
 function process_batch!(batch::ACBatch, ac)
-    @assert all(isfinite, batch.gpu_querry) "$batch.gpu_querry"
+    @assert all(isfinite, batch.gpu_query) "$batch.gpu_query"
 
-    (; policy, value) = ac(batch.gpu_querry; logits=true)
+    (; policy, value) = ac(batch.gpu_query; logits=true)
 
     @assert all(isfinite, value)
     @assert all(isfinite, policy)
@@ -77,9 +77,9 @@ Base.eltype(::BatchManager{T, B}) where {T, B} = B
 Base.isready(bm::BatchManager) = isready(bm.gpu_jobs)
 Base.take!(bm::BatchManager) = take!(bm.gpu_jobs)
 
-function set_querry!(bm::BatchManager, agentindex::Integer, query)
+function set_query!(bm::BatchManager, agentindex::Integer, query)
     batch, batchindex = take!(bm.avail_querries)
-    n_ready = set_querry!(batch, batchindex, agentindex, query)
+    n_ready = set_query!(batch, batchindex, agentindex, query)
 
     if n_ready == batch.batchsize
         queue_batch!(bm, batch)
@@ -89,13 +89,13 @@ function set_querry!(bm::BatchManager, agentindex::Integer, query)
 end
 
 function queue_batch!(bm::BatchManager, batch::ACBatch)
-    copyto!(batch.gpu_querry, batch.cpu_querry)
+    copyto!(batch.gpu_query, batch.cpu_query)
     CUDA.synchronize()
     put!(bm.gpu_jobs, batch)
     return nothing
 end
 
-function free_querry!(bm::BatchManager, batch::ACBatch, index::Integer)
+function free_query!(bm::BatchManager, batch::ACBatch, index::Integer)
     put!(bm.avail_querries, (batch, index))
     return nothing
 end

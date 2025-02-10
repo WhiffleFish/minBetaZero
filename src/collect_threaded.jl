@@ -1,13 +1,13 @@
-struct GPUQuerry{C<:Channel, QC<:Array{Float32}, QG<:CuArray, V<:Vector, P<:Matrix}
+struct GPUquery{C<:Channel, QC<:Array{Float32}, QG<:CuArray, V<:Vector, P<:Matrix}
     channels::Vector{C}
-    cpu_batched_querry::QC
-    gpu_batched_querry::QG
+    cpu_batched_query::QC
+    gpu_batched_query::QG
     cpu_value::V
     cpu_policy::P
 end
 
-function GPUQuerry(; sz::Tuple, na::Int, batchsize::Int)
-    return GPUQuerry(
+function GPUquery(; sz::Tuple, na::Int, batchsize::Int)
+    return GPUquery(
         Channel[],
         zeros(Float32, sz..., batchsize),
         CUDA.zeros(Float32, sz..., batchsize),
@@ -40,25 +40,25 @@ function gen_data_threaded(pomdp::POMDP, net, params::minBetaZeroParameters, buf
             end
         end
 
-        querry_ch = Channel(n_episodes)
+        query_ch = Channel(n_episodes)
 
-        worker_tasks = [threaded_worker(querry_ch, storage_channel, pomdp, params) for _ in 1:n_episodes]
+        worker_tasks = [threaded_worker(query_ch, storage_channel, pomdp, params) for _ in 1:n_episodes]
 
         net = LockedNetwork(gpu(net))
         sz = (input_dims..., GumbelSolver_args.n_particles)
         batchsize = inference_batchsize
 
-        gpu_tasks = Threads.@spawn gpu_worker(querry_ch, net; sz, na, batchsize)
+        gpu_tasks = Threads.@spawn gpu_worker(query_ch, net; sz, na, batchsize)
         errormonitor(gpu_tasks)
 
         # gpu_tasks = Vector{Task}(undef,2)
         # for i in 1:2
-        #     gpu_tasks[i] = Threads.@spawn gpu_worker(querry_ch, net; sz, na, batchsize)
+        #     gpu_tasks[i] = Threads.@spawn gpu_worker(query_ch, net; sz, na, batchsize)
         #     errormonitor(gpu_tasks[i])
         # end
 
         wait.(worker_tasks)
-        close(querry_ch)
+        close(query_ch)
 
         wait(progresstaskref[])
         ch_to_buff(results_channel, buffer, n_episodes)
@@ -83,7 +83,7 @@ function ch_to_buff(results_channel, buffer, n_episodes)
     return ret_vec, steps
 end
 
-function threaded_worker(querry_ch::Channel, storage_channel::Channel, pomdp::POMDP, params::minBetaZeroParameters)
+function threaded_worker(query_ch::Channel, storage_channel::Channel, pomdp::POMDP, params::minBetaZeroParameters)
     (; GumbelSolver_args) = params
 
     worker_ch = Channel()
@@ -91,7 +91,7 @@ function threaded_worker(querry_ch::Channel, storage_channel::Channel, pomdp::PO
     worker_task = Threads.@spawn begin
         function getpolicyvalue(b)
             b_rep = input_representation(b)
-            put!(querry_ch, (worker_ch, b_rep))
+            put!(query_ch, (worker_ch, b_rep))
             out = take!(worker_ch)
             return (; value=out.value[], policy=vec(out.policy))
         end
@@ -112,39 +112,39 @@ function threaded_worker(querry_ch::Channel, storage_channel::Channel, pomdp::PO
     return worker_task
 end
 
-function gpu_worker(querry_ch::Channel, net; sz::Tuple, na::Int, batchsize::Int)
-    Q = GPUQuerry(; sz, na, batchsize)
+function gpu_worker(query_ch::Channel, net; sz::Tuple, na::Int, batchsize::Int)
+    Q = GPUquery(; sz, na, batchsize)
 
-    while isopen(querry_ch)
+    while isopen(query_ch)
         empty!(Q.channels)
 
-        lock(querry_ch)
+        lock(query_ch)
         try
-            isready(querry_ch) || wait(querry_ch)
-            _gpu_worker(querry_ch, net, Q)
+            isready(query_ch) || wait(query_ch)
+            _gpu_worker(query_ch, net, Q)
             # GC.gc(false)
         catch e
             expected_exit = isa(e, InvalidStateException) && e.state === :closed
             expected_exit ? break : rethrow()
         finally
-            unlock(querry_ch)
+            unlock(query_ch)
         end
     end
 
     return nothing
 end
 
-function _gpu_worker(querry_ch::Channel, net, Q::GPUQuerry)
-    for cpu_querry in eachslice(Q.cpu_batched_querry; dims=ndims(Q.cpu_batched_querry))
-        isready(querry_ch) || break
-        (ch, querry) = take!(querry_ch)
+function _gpu_worker(query_ch::Channel, net, Q::GPUquery)
+    for cpu_query in eachslice(Q.cpu_batched_query; dims=ndims(Q.cpu_batched_query))
+        isready(query_ch) || break
+        (ch, query) = take!(query_ch)
         push!(Q.channels, ch)
-        copyto!(cpu_querry, querry)
+        copyto!(cpu_query, query)
     end
 
-    copyto!(Q.gpu_batched_querry, Q.cpu_batched_querry)
+    copyto!(Q.gpu_batched_query, Q.cpu_batched_query)
 
-    net_out = net(Q.gpu_batched_querry; logits=true)
+    net_out = net(Q.gpu_batched_query; logits=true)
 
     copyto!(Q.cpu_value, net_out.value)
     copyto!(Q.cpu_policy, net_out.policy)

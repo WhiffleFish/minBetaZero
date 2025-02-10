@@ -76,8 +76,8 @@ function initialize_agent!(agent::MDPAgent)
     (; mcts, history) = agent
     s = history.state[end]
     insert_root!(mcts, s)
-    s_querry = mcts_forward!(mcts)
-    return s_querry
+    s_query = mcts_forward!(mcts)
+    return s_query
 end
 
 function step_agent!(agent::MDPAgent, history_channel::Channel)

@@ -26,8 +26,8 @@ function MDPWorker(mdp::MDP, actor_critic, history_channel::Channel, params::Alp
 
     # initialize all the agents
     for (agent_idx, agent) in enumerate(agents)
-        s_querry = initialize_agent!(agent)
-        set_querry!(batch_manager, agent_idx, s_querry)
+        s_query = initialize_agent!(agent)
+        set_query!(batch_manager, agent_idx, s_query)
     end
     @assert isready(batch_manager)
 
@@ -44,7 +44,7 @@ function MDPWorker(mdp::MDP, actor_critic, history_channel::Channel, params::Alp
 end
 
 function update_actor_critic!(worker::MDPWorker, actor_critic)
-    foreach(copyto!, Flux.trainable(worker.actor_critic), Flux.trainable(actor_critic))
+    Flux.loadmodel!(worker.actor_critic, actor_critic)
 end
 
 function worker_main(worker::MDPWorker, n_steps::Integer; ntasks = Threads.nthreads() - 1)
@@ -101,7 +101,7 @@ function process_agent(worker::MDPWorker, batch::ACBatch, index::Integer)
 
     mcts_backward!(mcts, value, policy)
 
-    free_querry!(batch_manager, batch, index)
+    free_query!(batch_manager, batch, index)
 
     if Base.isdone(mcts)
         step_agent!(agent, history_channel)
@@ -109,9 +109,9 @@ function process_agent(worker::MDPWorker, batch::ACBatch, index::Integer)
         Threads.atomic_add!(steps_since_gc, 1)
     end
 
-    s_querry = mcts_forward!(mcts)
+    s_query = mcts_forward!(mcts)
 
-    set_querry!(batch_manager, agent_idx, s_querry)
+    set_query!(batch_manager, agent_idx, s_query)
 
     return nothing
 end

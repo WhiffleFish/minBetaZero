@@ -79,15 +79,15 @@ function POMDPTools.action_info(planner::GumbelPlanner, b_root)
                 break
             end
 
-            b_querry, ba_idx, r, done = mcts_forward(planner, particle_b_root)
+            b_query, ba_idx, r, done = mcts_forward(planner, particle_b_root)
 
             if done
                 value, policy = 0f0, zeros(Float32, length(ordered_actions))
             else
-                (; value, policy) = getpolicyvalue(b_querry)
+                (; value, policy) = getpolicyvalue(b_query)
             end
 
-            mcts_backward!(planner, b_querry, ba_idx, r, value, policy)
+            mcts_backward!(planner, b_query, ba_idx, r, value, policy)
         end
 
         a = select_best_action(planner)
@@ -134,7 +134,7 @@ function mcts_forward(planner::GumbelPlanner, b_root)
     (; Nh, Nha, b, ba_children, b_children) = tree
 
     if isempty(b_children)
-        b_querry = b_root
+        b_query = b_root
         ba_idx = 0
         r = 0.0
         done = false
@@ -143,7 +143,7 @@ function mcts_forward(planner::GumbelPlanner, b_root)
         b_idx = 1
         ai, ba_idx = select_root_action(planner)
         a = ordered_actions[ai]
-        b_querry = b[b_idx]
+        b_query = b[b_idx]
         r = 0.0
         done = false
 
@@ -154,11 +154,11 @@ function mcts_forward(planner::GumbelPlanner, b_root)
             @assert depth < 1 + length(b) "Loop has spiraled out of control!"
 
             if isterminalbelief(b[b_idx])
-                b_querry = b[b_idx]
+                b_query = b[b_idx]
                 done = true
                 break
             elseif length(ba_children[ba_idx]) < k_o * Nha[ba_idx] ^ alpha_o
-                b_querry, r, done = gen_querry(planner, tree.b[b_idx], a)
+                b_query, r, done = gen_query(planner, tree.b[b_idx], a)
                 break
             else
                 b_idx = argmin(_bp_idx -> Nh[_bp_idx], ba_children[ba_idx])
@@ -167,10 +167,10 @@ function mcts_forward(planner::GumbelPlanner, b_root)
         end
     end
 
-    return b_querry, ba_idx, r, done
+    return b_query, ba_idx, r, done
 end
 
-function gen_querry(planner::GumbelPlanner, b, a)
+function gen_query(planner::GumbelPlanner, b, a)
     (; pomdp, sol, cache) = planner
     (; rng, resample) = sol
 
@@ -180,20 +180,20 @@ function gen_querry(planner::GumbelPlanner, b, a)
 
     bp_particles, bp_weights = gen_empty_belief(cache, n_particles(b))
 
-    b_querry, r, _ = GenBelief(
+    b_query, r, _ = GenBelief(
         rng, bp_particles, bp_weights, cache.resample,
         pomdp, b, a, o, p_idx, sample_sp, sample_r, resample
     )
 
-    done = isterminalbelief(b_querry)
+    done = isterminalbelief(b_query)
 
-    return b_querry, r, done
+    return b_query, r, done
 end
 
-function mcts_backward!(planner::GumbelPlanner, b_querry, ba_idx, r, value, logits)
+function mcts_backward!(planner::GumbelPlanner, b_query, ba_idx, r, value, logits)
     update_dq!(planner, value)
 
-    b_idx = insert_belief!(planner.tree, b_querry; ba_idx, r, value, logits)
+    b_idx = insert_belief!(planner.tree, b_query; ba_idx, r, value, logits)
 
     if b_idx == 1
         mcts_backward_root!(planner, logits)

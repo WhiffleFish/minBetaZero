@@ -57,18 +57,18 @@ function work_fun(pomdp, planner, params)
 
     for step_num in 1:t_max
         # if n_planning_particles == n_particles
-        #     b_querry = b
+        #     b_query = b
         # else
         #     b_perm = randperm(n_particles)[1:n_planning_particles]
-        #     b_querry = ParticleCollection(particles(b)[b_perm])
+        #     b_query = ParticleCollection(particles(b)[b_perm])
         # end
-        b_querry = rand(b, n_planning_particles)
+        b_query = rand(b, n_planning_particles)
 
-        a, a_info = action_info(planner, b_querry)
+        a, a_info = action_info(planner, b_query)
         aid = actionindex(pomdp, a)
         s, r, o = @gen(:sp,:r,:o)(pomdp, s, a)
 
-        b_target = train_on_planning_b ? b_querry : b
+        b_target = train_on_planning_b ? b_query : b
 
         push!.((b_vec, aid_vec, state_reward), (b_target, aid, r))
 

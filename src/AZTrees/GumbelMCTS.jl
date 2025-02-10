@@ -28,7 +28,7 @@ mutable struct GumbelSearch{M, S, A, RNG}
 
         na = length(actions(mdp))
 
-        tree_querries   = 1 + floor(Int, tree_querries) # root querry addition
+        tree_querries   = 1 + floor(Int, tree_querries) # root query addition
         ordered_actions = POMDPTools.ordered_actions(mdp)
         m_acts_init     = floor(Int, m_acts_init)
         live_actions    = falses(na)
@@ -112,12 +112,12 @@ end
 function mcts_forward!(planner::GumbelSearch)
     if isempty(planner.tree.s_children)
         s_idx = 1
-        s_querry = planner.tree.s[s_idx]
+        s_query = planner.tree.s[s_idx]
     else
-        s_querry, s_idx = mcts_forward_nonroot(planner)
+        s_query, s_idx = mcts_forward_nonroot(planner)
     end
     planner.s_idx = s_idx
-    return s_querry
+    return s_query
 end
 
 function mcts_forward_nonroot!(planner::GumbelSearch)
@@ -128,7 +128,7 @@ function mcts_forward_nonroot!(planner::GumbelSearch)
     s_idx = 1
     ai, sa_idx = select_root_action!(planner)
     a = ordered_actions[ai]
-    s_querry = s[s_idx]
+    s_query = s[s_idx]
 
     # do nonroot stuff
     depth = 0
@@ -137,11 +137,11 @@ function mcts_forward_nonroot!(planner::GumbelSearch)
         @assert depth < 1 + length(s) "Loop has spiraled out of control!"
 
         if isterminalbelief(s[s_idx])
-            s_querry = s[s_idx]
+            s_query = s[s_idx]
             break
         elseif length(sa_children[sa_idx]) < k_o * Nha[sa_idx] ^ alpha_o
-            s_querry, r = @gen(:sp, :r)(mdp, s[s_idx], a, rng)
-            s_idx = insert_state!(planner, s_querry; r, logits=zeros(Float32, length(ordered_actions)))
+            s_query, r = @gen(:sp, :r)(mdp, s[s_idx], a, rng)
+            s_idx = insert_state!(planner, s_query; r, logits=zeros(Float32, length(ordered_actions)))
             break
         else
             s_idx = argmin(_bp_idx -> Nh[_bp_idx], sa_children[sa_idx])
@@ -149,7 +149,7 @@ function mcts_forward_nonroot!(planner::GumbelSearch)
         end
     end
 
-    return s_querry, s_idx
+    return s_query, s_idx
 end
 
 function mcts_backward!(planner::GumbelSearch, value, logits)

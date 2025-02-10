@@ -25,7 +25,7 @@ struct GumbelSearch{Tree, A, M, RNG}
 
         na = length(actions(mdp))
 
-        tree_queries   = floor(Int, tree_queries) # root querry addition
+        tree_queries   = floor(Int, tree_queries) # root query addition
         ordered_actions = POMDPTools.ordered_actions(mdp)
         m_acts_init     = floor(Int, m_acts_init)
         live_actions    = [false for _ in 1:na]
@@ -141,8 +141,8 @@ function mcts_forward_nonroot!(planner::GumbelSearch)
         a, sa_idx = select_action!(planner, s_idx)
 
         if n_sa_children(tree, sa_idx) < k_o * Nha[sa_idx] ^ alpha_o
-            s_querry, r = @gen(:sp, :r)(mdp, state[s_idx], a, rng)
-            s_idx = insert_state!(tree, s_querry, sa_idx, r)
+            s_query, r = @gen(:sp, :r)(mdp, state[s_idx], a, rng)
+            s_idx = insert_state!(tree, s_query, sa_idx, r)
             exit_flag = true
         else
             s_idx = argmin(i -> Nh[i], sa_children(tree, sa_idx))

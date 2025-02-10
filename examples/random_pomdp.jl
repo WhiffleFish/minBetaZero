@@ -218,18 +218,18 @@ b = initialize_belief(up, initialstate(pomdp))
 s = rand(initialstate(pomdp))
 
 b_vec = []
-b_querry_vec = []
+b_query_vec = []
 a_vec = []
 s_vec = [s]
 r_vec = Float64[]
 
 for step_num in 1:250
-    b_querry = rand(b, 100)
+    b_query = rand(b, 100)
 
-    a = action(planner, b_querry)
+    a = action(planner, b_query)
     s, r, o = @gen(:sp,:r,:o)(pomdp, s, a)
 
-    push!.((b_vec, b_querry_vec, a_vec, s_vec, r_vec), (b, b_querry, a, s, r))
+    push!.((b_vec, b_query_vec, a_vec, s_vec, r_vec), (b, b_query, a, s, r))
 
     if isterminal(pomdp, s)
         break
