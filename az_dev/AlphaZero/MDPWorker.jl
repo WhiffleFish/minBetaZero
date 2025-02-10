@@ -44,7 +44,7 @@ function MDPWorker(mdp::MDP, actor_critic, history_channel::Channel, params::Alp
 end
 
 function update_actor_critic!(worker::MDPWorker, actor_critic)
-    foreach(copyto!, Flux.params(worker.actor_critic), Flux.params(actor_critic))
+    foreach(copyto!, Flux.trainable(worker.actor_critic), Flux.trainable(actor_critic))
 end
 
 function worker_main(worker::MDPWorker, n_steps::Integer; ntasks = Threads.nthreads() - 1)
@@ -54,7 +54,7 @@ function worker_main(worker::MDPWorker, n_steps::Integer; ntasks = Threads.nthre
     ch_eltype = Tuple{eltype(batch_manager), Int}
 
     response_ch = Channel{ch_eltype}(buff_len; spawn=true) do ch
-        actor_critic_worker(worker, ch, n_steps)
+        actor_critic_worker(worker, ch, n_steps) # producer
     end
 
     Threads.foreach(response_ch; ntasks) do (batch, index)

@@ -170,7 +170,7 @@ function mcts_backward_root!(planner::GumbelSearch, value, logits)
     update_prior!(tree, 1, logits, value)
 
     # add gumbel noise to root logits for sampling and action selection
-    for i in 1:size(prior_logits, 1)
+    for i in axes(prior_logits, 1)
         u = rand(rng, eltype(prior_logits))
         prior_logits[i, 1] += -log(-log(u))
     end
